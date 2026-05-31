@@ -74,16 +74,34 @@ def get_engine_url() -> str:
 
 def get_token() -> Optional[str]:
     cfg = load_config()
-    return cfg.get("token")
+    return cfg.get("token") or cfg.get("api_key")
 
 
 async def login():
     """Authentifie l'utilisateur via le SaaS VelocityContent."""
     console.print(Panel.fit(
         "[bold cyan]Connexion à VelocityContent[/bold cyan]\n"
-        "Connecte-toi pour accéder à tes projets et générations vidéo.",
+        "Choisis ton mode de connexion.",
         border_style="cyan"
     ))
+
+    mode = await questionary.select(
+        "Méthode de connexion :",
+        choices=[
+            "🔑 Clé API (depuis les paramètres SaaS)",
+            "📧 Email + Mot de passe",
+        ],
+    ).ask_async()
+
+    if "Clé API" in mode:
+        api_key = Prompt.ask("[bold]Colle ta clé API[/bold]")
+        cfg = load_config()
+        cfg["api_key"] = api_key
+        cfg["token"] = api_key
+        cfg["user"] = {"source": "api_key"}
+        save_config(cfg)
+        console.print("[green]✓ Clé API configurée ![/green]")
+        return api_key
 
     email = Prompt.ask("[bold]Email[/bold]")
     password = Prompt.ask("[bold]Mot de passe[/bold]", password=True)
@@ -779,9 +797,17 @@ async def workflow_settings():
     engine_url = Prompt.ask("URL du moteur de rendu", default=cfg.get("engine_url", ENGINE_URL))
     anon_key = Prompt.ask("Clé anonyme Supabase", default=cfg.get("anon_key", ""))
 
+    console.print("\n[cyan]Configuration de la clé API :[/cyan]")
+    console.print("  Génère une clé depuis le SaaS : Paramètres > API Keys")
+    current_key = cfg.get("api_key", "")
+    new_key = Prompt.ask("Clé API (laisser vide pour conserver)", default=current_key)
+
     cfg["api_url"] = api_url
     cfg["engine_url"] = engine_url
     cfg["anon_key"] = anon_key if anon_key else cfg.get("anon_key", "")
+    if new_key:
+        cfg["api_key"] = new_key
+        cfg["token"] = new_key
     save_config(cfg)
 
     console.print("[green]✓ Paramètres sauvegardés[/green]")
