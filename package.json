@@ -1,0 +1,32 @@
+{
+  "name": "cauflia",
+  "version": "1.0.0",
+  "description": "L'agent autonome de création de vidéos et stratégies marketing relié à ton SaaS VelocityContent",
+  "main": "bin/index.js",
+  "type": "module",
+  "bin": {
+    "cauflia": "./bin/index.js"
+  },
+  "scripts": {
+    "start": "node bin/index.js"
+  },
+  "keywords": [
+    "cli",
+    "agent",
+    "video",
+    "ai",
+    "velocity",
+    "gemini",
+    "marketing"
+  ],
+  "author": "Opencode & Alexis Portelli",
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "@google/generative-ai": "^0.11.0",
+    "commander": "^11.1.0",
+    "dotenv": "^16.4.5",
+    "ora": "^7.0.1",
+    "picocolors": "^1.0.0"
+  }
+}
