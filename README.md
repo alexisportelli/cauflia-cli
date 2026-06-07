@@ -1,6 +1,6 @@
 # 🎬 CAUFLIA CLI - L'Agent Vidéo Autonome
 
-Cauflia est un CLI (Command Line Interface) de type **Claude Code** relié directement à ton SaaS **VelocityContent**.
+Cauflia est un agent autonome en ligne de commande qui transforme une simple idée en vidéo complète avec stratégie marketing, voix-off, musique et sous-titres.
 
 En un seul prompt, l'agent crée ta stratégie marketing, rédige un script de voix-off captivant, génère tes premières scènes vidéo animées avec des dégradés de couleurs fluides, ajoute une voix off française réaliste ainsi qu'une musique d'ambiance, et envoie le tout au SaaS pour validation avant publication !
 

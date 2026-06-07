@@ -19,7 +19,7 @@
     "gemini",
     "marketing"
   ],
-  "author": "Opencode & Alexis Portelli",
+  "author": "Alexis Portelli",
   "license": "MIT",
   "dependencies": {
     "@clack/prompts": "^0.7.0",
