@@ -1,7 +1,7 @@
 {
   "name": "cauflia",
   "version": "1.0.0",
-  "description": "L'agent autonome de création de vidéos et stratégies marketing relié à ton SaaS VelocityContent",
+  "description": "CLI autonome de création vidéo — agent IA, montage, édition, téléchargement YouTube, médiathèque locale",
   "main": "bin/index.js",
   "type": "module",
   "bin": {
@@ -15,9 +15,12 @@
     "agent",
     "video",
     "ai",
-    "velocity",
     "gemini",
-    "marketing"
+    "marketing",
+    "editor",
+    "ffmpeg",
+    "youtube",
+    "downloader"
   ],
   "author": "Alexis Portelli",
   "license": "MIT",

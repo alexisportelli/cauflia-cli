@@ -2,20 +2,46 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { assembleVideo } from "./video-generator.js";
+import { getDir, addMedia } from "./media-library.js";
 import fs from "fs";
 import path from "path";
+
+function showBanner() {
+  console.log("");
+  console.log(pc.bold(pc.hex("#6366f1")("  ╔══════════════════════════════════════════╗")));
+  console.log(pc.bold(pc.hex("#a855f7")("  ║          ") + pc.bold(pc.hex("#ec4899")("CAUFLIA AGENT")) + pc.bold(pc.hex("#a855f7")("            ║")));
+  console.log(pc.bold(pc.hex("#6366f1")("  ╚══════════════════════════════════════════╝")));
+  console.log("");
+}
+
+function showSection(title) {
+  console.log("");
+  console.log(pc.bold(pc.hex("#a855f7")(`  ── ${title} ──`)));
+  console.log("");
+}
 
 export async function runAgent(prompt, config) {
   const s = p.spinner();
 
-  // 1. Initialize Gemini
-  s.start("Connexion à l'intelligence artificielle Gemini...");
+  showBanner();
+
+  // 1. Check Gemini key
+  if (!config.GEMINI_API_KEY) {
+    p.log.error(pc.red("Aucune clé API Gemini configurée."));
+    p.log.info(pc.cyan("Configure-la avec : ") + pc.bold("cauflia config"));
+    return;
+  }
+
+  // 2. Initialize Gemini
+  s.start(pc.hex("#a855f7")("Connexion à l'IA Gemini..."));
   const genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
   s.stop(pc.green("✔ Connecté à Gemini."));
 
-  // 2. Draft strategy and script
-  s.start("Création de votre stratégie marketing et écriture des scènes...");
+  // 3. Generate strategy & script
+  showSection("Génération de la stratégie");
+  s.start(pc.hex("#a855f7")("Création de ta stratégie marketing et écriture des scènes..."));
+
   const systemInstruction = `
   Tu es Cauflia, un agent d'intelligence artificielle ultra-compétent spécialisé dans la création de vidéos virales de format court (TikTok, Instagram Reels, YouTube Shorts).
   Ton but est de concevoir une stratégie marketing redoutable pour le prompt de l'utilisateur, d'écrire un script de voix-off captivant et de découper la vidéo en 3 à 5 scènes clés.
@@ -28,7 +54,7 @@ export async function runAgent(prompt, config) {
   - Choisis un style musical de fond cohérent parmi ces trois options : 'lofi', 'synthwave', 'cinematic'.
   - Assigne une ambiance visuelle ('mood') à chaque scène parmi : 'sunset', 'ocean', 'cyberpunk', 'velvet'.
 
-  Tu dois STRICTEMENT retourner uniquement un objet JSON valide (sans fioritures, sans balises markdown de type \`\`\`json, juste le texte brut du JSON) respectant ce schéma exact :
+  Tu dois STRICTEMENT retourner uniquement un objet JSON valide (sans fioritures, sans balises markdown, juste le texte brut du JSON) respectant ce schéma exact :
   {
     "strategy": "Une explication détaillée et percutante de la stratégie TikTok, pourquoi ça va marcher, le public cible, et les conseils de hashtags.",
     "title": "Titre accrocheur du projet",
@@ -56,14 +82,9 @@ export async function runAgent(prompt, config) {
     throw new Error("Erreur de l'API Gemini : " + err.message);
   }
 
-  // Clean the output to ensure valid JSON
   let cleanedJson = responseText.trim();
-  if (cleanedJson.startsWith("```json")) {
-    cleanedJson = cleanedJson.substring(7);
-  }
-  if (cleanedJson.endsWith("```")) {
-    cleanedJson = cleanedJson.substring(0, cleanedJson.length - 3);
-  }
+  if (cleanedJson.startsWith("```json")) cleanedJson = cleanedJson.slice(7);
+  if (cleanedJson.endsWith("```")) cleanedJson = cleanedJson.slice(0, -3);
   cleanedJson = cleanedJson.trim();
 
   let generatedData;
@@ -78,30 +99,53 @@ export async function runAgent(prompt, config) {
 
   s.stop(pc.green("✔ Stratégie et scènes prêtes !"));
 
-  // Display strategy beautifully
-  p.note(generatedData.strategy, pc.cyan(`Stratégie Marketing : ${generatedData.title}`));
+  // Display strategy
+  showSection("Stratégie Marketing");
+  console.log(pc.bold(pc.hex("#ec4899")(`  ${generatedData.title}`)));
+  console.log("");
+  console.log(`  ${generatedData.strategy}`);
+  console.log("");
 
-  // Display scenes summary
-  p.log.info(pc.yellow("Plan de montage vidéo généré :"));
-  generatedData.scenes.forEach((scene, i) => {
-    p.log.step(
-      `${pc.bold(`Scène ${i + 1} (${scene.mood})`)} : "${pc.italic(scene.text_overlay)}"\n  🔊 Voix-off: "${scene.voiceover_text}"`
-    );
-  });
+  // Display scenes
+  showSection("Scènes du script");
+  const moodEmojis = { sunset: "🌅", ocean: "🌊", cyberpunk: "🌆", velvet: "🌙" };
+  const moodColors = { sunset: "#f59e0b", ocean: "#06b6d4", cyberpunk: "#a855f7", velvet: "#be123c" };
 
-  // Ask for confirmation to proceed
+  for (let i = 0; i < generatedData.scenes.length; i++) {
+    const scene = generatedData.scenes[i];
+    const emoji = moodEmojis[scene.mood] || "🎬";
+    const color = moodColors[scene.mood] || "#6366f1";
+
+    console.log(pc.bold(pc.hex(color)(`  ${emoji} Scène ${i + 1} — ${scene.title}`)));
+    console.log(`     ${pc.hex(color)("▸ Texte écran :")} "${scene.text_overlay}"`);
+    console.log(`     ${pc.hex(color)("▸ Voix-off :")} "${scene.voiceover_text}"`);
+    console.log(`     ${pc.hex(color)("▸ Ambiance :")} ${scene.mood}`);
+    console.log("");
+  }
+
+  console.log(pc.dim(`  🎵 Style musical : ${generatedData.music_style}`));
+  console.log("");
+
+  // Ask to proceed with video assembly
   const proceed = await p.confirm({
-    message: "Voulez-vous lancer le montage automatique de la vidéo maintenant ?",
+    message: pc.hex("#6366f1")("Lancer le montage automatique de la vidéo ?"),
   });
 
   if (!proceed || p.isCancel(proceed)) {
-    p.log.warn(pc.yellow("Montage vidéo ignoré par l'utilisateur."));
+    p.log.warn(pc.yellow("Montage vidéo ignoré."));
+    showSection("Projet sauvegardé en local");
+    console.log(`  Le script et la stratégie sont disponibles ci-dessus.`);
+    console.log(`  Pour générer la vidéo plus tard : ${pc.bold("cauflia generate")}`);
     return;
   }
 
-  // 3. Assemble Video
-  s.start("Lancement de FFmpeg - Génération de la voix-off, des gradients et assemblage...");
-  const outputFilename = `cauflia_montage_${Date.now()}.mp4`;
+  // 4. Assemble Video
+  showSection("Montage vidéo en cours");
+  s.start(pc.hex("#a855f7")("FFmpeg — voix-off, gradients, sous-titres, musique..."));
+
+  const exportsDir = getDir("exports");
+  const outputFilename = path.join(exportsDir, `cauflia_${Date.now()}.mp4`);
+
   let videoResult;
   try {
     videoResult = await assembleVideo(
@@ -114,51 +158,72 @@ export async function runAgent(prompt, config) {
     s.stop(pc.red("✖ Échec du montage vidéo."));
     throw new Error("Erreur montage : " + err.message);
   }
-  s.stop(pc.green(`✔ Vidéo montée avec succès : ${outputFilename}`));
+  s.stop(pc.green("✔ Vidéo montée avec succès !"));
 
-  // 4. Send to SaaS & Notify
-  s.start("Envoi du projet et de la notification sur le SaaS VelocityContent...");
-  const saasUrl = config.saas_url || "http://localhost:3000";
-  const apiEndpoint = `${saasUrl.replace(/\/$/, "")}/api/cauflia`;
+  // Show result
+  const durationStr = videoResult.duration
+    ? `${Math.floor(videoResult.duration / 60)}m ${Math.floor(videoResult.duration % 60)}s`
+    : "?";
+  const fileSize = fs.existsSync(videoResult.filePath)
+    ? `${(fs.statSync(videoResult.filePath).size / 1024 / 1024).toFixed(1)} MB`
+    : "?";
 
-  try {
-    const res = await fetch(apiEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.api_key}`,
-      },
-      body: JSON.stringify({
-        action: "create_project",
-        title: generatedData.title,
-        description: generatedData.strategy,
-        video_url: outputFilename,
-        scenes: generatedData.scenes,
-        metadata: {
-          music_style: generatedData.music_style,
-          video_style: generatedData.video_style,
-          local_path: videoResult.filePath,
-          duration: videoResult.duration,
-        },
-      }),
+  console.log("");
+  console.log(`  ${pc.green("✔")} ${pc.bold("Vidéo générée :")}`);
+  console.log(`    ${pc.dim("Fichier :")} ${videoResult.filePath}`);
+  console.log(`    ${pc.dim("Durée :")}   ${durationStr}`);
+  console.log(`    ${pc.dim("Taille :")}  ${fileSize}`);
+  console.log("");
+
+  // 5. SaaS sync (OPTIONAL)
+  if (config.api_key && config.saas_url) {
+    const syncSaas = await p.confirm({
+      message: pc.hex("#6366f1")("Envoyer le projet sur le SaaS Cauflia ?"),
     });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Le serveur a renvoyé un statut ${res.status} : ${errText}`);
-    }
+    if (syncSaas && !p.isCancel(syncSaas)) {
+      s.start(pc.hex("#a855f7")("Synchronisation avec le SaaS..."));
+      const saasUrl = config.saas_url.replace(/\/$/, "");
+      const apiEndpoint = `${saasUrl}/api/cauflia`;
 
-    const saasData = await res.json();
-    s.stop(pc.green("✔ Synchronisé avec le SaaS !"));
-    
-    p.note(
-      `1. Ouvrez votre SaaS VelocityContent : ${pc.underline(saasUrl)}\n2. Allez sur votre Tableau de Bord ou l'historique.\n3. Vous avez reçu une Notification.\n4. Cliquez sur "Examiner & Publier" pour visionner le projet "${generatedData.title}" et accepter la publication !`,
-      "🎉 Étapes suivantes pour publier"
-    );
-  } catch (err) {
-    s.stop(pc.red("⚠ Impossible d'envoyer la notification au SaaS."));
-    p.log.warn(`Veuillez vérifier que votre SaaS est démarré sur : ${saasUrl}`);
-    p.log.warn(`Détail de l'erreur: ${err.message || err}`);
-    p.log.info(`Votre vidéo locale est sauvegardée ici : ${pc.bold(path.resolve(outputFilename))}`);
+      try {
+        const res = await fetch(apiEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.api_key}`,
+          },
+          body: JSON.stringify({
+            action: "create_project",
+            title: generatedData.title,
+            description: generatedData.strategy,
+            video_url: outputFilename,
+            scenes: generatedData.scenes,
+            metadata: {
+              music_style: generatedData.music_style,
+              video_style: generatedData.video_style,
+              local_path: videoResult.filePath,
+              duration: videoResult.duration,
+            },
+          }),
+        });
+
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        s.stop(pc.green("✔ Synchronisé avec le SaaS !"));
+      } catch (err) {
+        s.stop(pc.yellow("⚠ Impossible d'atteindre le SaaS"));
+      }
+    } else {
+      p.log.info(pc.dim("Projet conservé en local uniquement."));
+    }
   }
+
+  // Final message
+  console.log("");
+  console.log(pc.bold(pc.hex("#6366f1")("  ╔══════════════════════════════════════════╗")));
+  console.log(pc.bold(pc.hex("#a855f7")("  ║    ") + pc.bold(pc.hex("#ec4899")("✅ PROJET TERMINÉ !")) + pc.bold(pc.hex("#a855f7")("        ║")));
+  console.log(pc.bold(pc.hex("#6366f1")("  ╚══════════════════════════════════════════╝")));
+  console.log("");
+  console.log(`  ${pc.dim("Commande rapide :")} ${pc.bold(`cauflia "${prompt}"`)}`);
+  console.log("");
 }

@@ -1,77 +1,117 @@
-# 🎬 CAUFLIA CLI - L'Agent Vidéo Autonome
+# Cauflia CLI
 
-Cauflia est un agent autonome en ligne de commande qui transforme une simple idée en vidéo complète avec stratégie marketing, voix-off, musique et sous-titres.
+L'agent autonome de création vidéo — génère, télécharge, édite et monte des vidéos depuis le terminal.
 
-En un seul prompt, l'agent crée ta stratégie marketing, rédige un script de voix-off captivant, génère tes premières scènes vidéo animées avec des dégradés de couleurs fluides, ajoute une voix off française réaliste ainsi qu'une musique d'ambiance, et envoie le tout au SaaS pour validation avant publication !
+## Fonctionnalités
 
----
+- **Agent IA** — Génère une stratégie marketing + script vidéo en un prompt (Gemini)
+- **Montage automatique** — Voix-off TTS française, gradients animés, sous-titres, musique
+- **Édition vidéo** — Trim, concat, speed, crop, resize, overlays, effets
+- **Téléchargement YouTube** — Télécharge vidéos et audio, extrait des clips
+- **Médiathèque locale** — Gère tes fichiers vidéos, images, audio dans `~/cauflia-studio/`
+- **Mode local** — Fonctionne complètement hors-ligne, SaaS optionnel
 
-## 🚀 Fonctionnalités
+## Prérequis
 
-1. **Stratégie & Scripts Instantanés :** Analyse ton besoin grâce à Google Gemini pour bâtir une stratégie TikTok / Reels ultra-virale.
-2. **Montage Vidéo Local (FFmpeg) :**
-   - **Voix-off :** Synthétise automatiquement des fichiers audio voix-off français fluides grâce à une intégration TTS gratuite.
-   - **Images/Gradients :** Crée des animations vidéo verticales (9:16) stylisées avec des gradients de couleur en mouvement synchronisés à la voix-off.
-   - **Sous-titres :** Ajoute des overlays textuels stylisés directement sur les vidéos (style Alex Hormozi).
-   - **Musique :** Sélectionne et mixe une musique de fond appropriée (Lofi, Synthwave, Cinematic) avec réduction du bruit de fond.
-3. **Validation par le SaaS :** Pousse un nouveau projet vidéo et déclenche une notification temps réel sur le tableau de bord VelocityContent. Tu n'as plus qu'à cliquer pour approuver ou éditer !
+- **Node.js** v18+
+- **FFmpeg** — `winget install ffmpeg` ou `choco install ffmpeg`
+- **yt-dlp** (optionnel, pour YouTube) — `winget install yt-dlp` ou `pip install yt-dlp`
 
----
-
-## 🛠 Prérequis
-
-Assure-toi d'avoir installé sur ta machine :
-1. **Node.js** (v18 ou supérieur)
-2. **NPM**
-3. **FFmpeg** (nécessaire pour le montage vidéo local). Vérifie sa présence en écrivant `ffmpeg -version` dans ton terminal.
-
----
-
-## 📦 Installation
-
-1. Télécharge ou clone ce dossier :
-   ```bash
-   git clone https://github.com/alexisportelli/cauflia.git
-   cd cauflia
-   ```
-
-2. Installe les dépendances du projet :
-   ```bash
-   npm install
-   ```
-
-3. Lie la commande `cauflia` globalement à ton système :
-   ```bash
-   npm install -g .
-   ```
-
----
-
-## 🔑 Configuration
-
-Lors du premier lancement, ou via la commande de configuration, tu devras renseigner tes clés API :
+## Installation
 
 ```bash
+git clone https://github.com/alexisportelli/cauflia-cli.git
+cd cauflia-cli
+npm install
+npm install -g .
+```
+
+## Utilisation
+
+### Générer une vidéo avec l'IA
+
+```bash
+cauflia "Crée un TikTok sur le café de spécialité"
+```
+
+### Télécharger depuis YouTube
+
+```bash
+# Télécharger une vidéo
+cauflia download "https://youtube.com/watch?v=..."
+
+# Télécharger uniquement l'audio
+cauflia download -a "https://youtube.com/watch?v=..."
+
+# Extraire un clip (10s à 30s)
+cauflia download -c 10-30 "https://youtube.com/watch?v=..."
+```
+
+### Gérer la médiathèque
+
+```bash
+# Voir les statistiques
+cauflia library -s
+
+# Lister les vidéos
+cauflia library -l videos
+
+# Importer un fichier
+cauflia library -i video.mp4 -t videos
+
+# Ouvrir le dossier
+cauflia library --open
+```
+
+### Éditer une vidéo
+
+```bash
+# Couper un extrait
+cauflia edit video.mp4 --trim 5-15 -o clip.mp4
+
+# Concaténer plusieurs vidéos
+cauflia edit video1.mp4 video2.mp4 --concat -o fusion.mp4
+
+# Changer la vitesse
+cauflia edit video.mp4 --speed 2 -o fast.mp4
+
+# Ajouter un texte
+cauflia edit video.mp4 --text "Mon texte" -o texte.mp4
+
+# Ajouter un gradient
+cauflia edit video.mp4 --gradient sunset -o stylise.mp4
+
+# Mixer un audio
+cauflia edit video.mp4 --audio musique.mp3 -o mix.mp4
+
+# Voir les infos
+cauflia edit video.mp4 --info
+
+# Combiner plusieurs effets
+cauflia edit video.mp4 --trim 10-30 --speed 1.5 --gradient cyberpunk --audio bg.mp3 -o final.mp4
+```
+
+### Configuration
+
+```bash
+# Configuration interactive
 cauflia config
+
+# Voir la config actuelle
+cauflia config -s
+
+# Définir les clés rapidement
+cauflia config -g "AIzaSy..." -k "vc_..." -u "https://cauflia.app"
 ```
 
-Il te sera demandé :
-- **Clé API VelocityContent :** Générée directement dans l'onglet **Intégrations** de ton SaaS (`vc_...`).
-- **Clé API Google Gemini :** Pour alimenter l'agent décisionnel et créatif.
-- **URL de ton SaaS :** Par exemple, `http://localhost:3000`.
+## Structure des fichiers
 
----
-
-## ⚡ Utilisation
-
-Pour lancer la création d'un projet, écris simplement `cauflia` suivi de ton prompt entre guillemets, ou lance-le sans arguments pour entrer en mode interactif :
-
-```bash
-cauflia "Crée un TikTok sur le café de spécialité et pourquoi c'est meilleur que le café industriel"
 ```
-
-### Déroulement de l'agent :
-1. **Génération de l'idée :** L'agent conçoit la stratégie TikTok et l'affiche à l'écran.
-2. **Écriture du script :** Découpage de la vidéo en scènes (visuels, textes, audio).
-3. **Montage de la vidéo :** Synthèse de la voix-off française + rendu des dégradés vidéo + intégration de la musique et sous-titres avec FFmpeg.
-4. **Synchronisation SaaS :** Envoi d'une notification push instantanée sur VelocityContent avec un bouton **Examiner & Publier** !
+~/cauflia-studio/
+  videos/     # Vidéos importées et téléchargées
+  images/     # Images importées
+  audio/      # Fichiers audio importés
+  projects/   # Projets importés
+  exports/    # Vidéos générées et éditées
+  library-index.json  # Index de la médiathèque
+```
