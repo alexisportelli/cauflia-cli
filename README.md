@@ -1,21 +1,22 @@
-# Cauflia CLI
+# Cauflia 🤖
 
-L'agent autonome de création vidéo — génère, télécharge, édite et monte des vidéos depuis le terminal.
+**Agent IA conversationnel de type OpenClaw** — Chatte avec une IA qui a un accès complet à ton terminal : exécute des commandes, lit/écrit des fichiers, génère et édite des vidéos, télécharge depuis YouTube, gère ta médiathèque.
 
 ## Fonctionnalités
 
-- **Agent IA** — Génère une stratégie marketing + script vidéo en un prompt (Gemini)
-- **Montage automatique** — Voix-off TTS française, gradients animés, sous-titres, musique
-- **Édition vidéo** — Trim, concat, speed, crop, resize, overlays, effets
-- **Téléchargement YouTube** — Télécharge vidéos et audio, extrait des clips
-- **Médiathèque locale** — Gère tes fichiers vidéos, images, audio dans `~/cauflia-studio/`
-- **Mode local** — Fonctionne complètement hors-ligne, SaaS optionnel
+- **💬 Chat IA temps réel** — Streaming des réponses, outils exécutés automatiquement
+- **🖥️ Accès système** — Exécute des commandes shell, lit/écrit des fichiers, explore les dossiers
+- **🎬 Génération vidéo IA** — Stratégie marketing + script + montage automatique (voix-off TTS, gradients, sous-titres, musique)
+- **✂️ Édition vidéo** — Trim, concat, speed, crop, resize, overlays, effets (vignette, grain, gradients)
+- **📥 Téléchargement YouTube** — Vidéos et audio, extraction de clips
+- **📚 Médiathèque locale** — Gère tes fichiers dans `~/cauflia-studio/`
+- **🌐 Mode local** — Fonctionne complètement hors-ligne (SaaS optionnel)
 
 ## Prérequis
 
 - **Node.js** v18+
-- **FFmpeg** — `winget install ffmpeg` ou `choco install ffmpeg`
-- **yt-dlp** (optionnel, pour YouTube) — `winget install yt-dlp` ou `pip install yt-dlp`
+- **FFmpeg** — `winget install ffmpeg`
+- **yt-dlp** (optionnel, pour YouTube) — `winget install yt-dlp`
 
 ## Installation
 
@@ -26,82 +27,63 @@ npm install
 npm install -g .
 ```
 
-## Utilisation
-
-### Générer une vidéo avec l'IA
+Configure ta clé Gemini au premier lancement :
 
 ```bash
+cauflia config
+```
+
+## Utilisation
+
+### Lancer le chat interactif
+
+```bash
+# Démarre une session chat avec l'agent
+cauflia
+
+# Ou lance directement avec un prompt
 cauflia "Crée un TikTok sur le café de spécialité"
 ```
 
-### Télécharger depuis YouTube
+Dans le chat, l'agent peut faire tout ça automatiquement :
+
+```
+👤 Vous ❯ Trouve les fichiers JS les plus récents dans le dossier src
+👤 Vous ❯ Télécharge cette vidéo YouTube et extrais-en l'audio
+👤 Vous ❯ Écris un script Python qui scrape ce site web
+👤 Vous ❯ Concatène video1.mp4 et video2.mp4 avec un overlay texte
+```
+
+L'agent exécute les outils (commandes shell, lecture/écriture fichiers, édition vidéo, etc.) de manière totalement autonome et transparente — pas de confirmation demandée.
+
+### Commandes directes (sans chat)
 
 ```bash
-# Télécharger une vidéo
+# Télécharger depuis YouTube
 cauflia download "https://youtube.com/watch?v=..."
-
-# Télécharger uniquement l'audio
 cauflia download -a "https://youtube.com/watch?v=..."
-
-# Extraire un clip (10s à 30s)
 cauflia download -c 10-30 "https://youtube.com/watch?v=..."
-```
 
-### Gérer la médiathèque
+# Gérer la médiathèque
+cauflia library -s                          # Statistiques
+cauflia library -l videos                   # Lister les vidéos
+cauflia library -i video.mp4 -t videos      # Importer
+cauflia library --open                      # Ouvrir le dossier
 
-```bash
-# Voir les statistiques
-cauflia library -s
-
-# Lister les vidéos
-cauflia library -l videos
-
-# Importer un fichier
-cauflia library -i video.mp4 -t videos
-
-# Ouvrir le dossier
-cauflia library --open
-```
-
-### Éditer une vidéo
-
-```bash
-# Couper un extrait
+# Éditer une vidéo
 cauflia edit video.mp4 --trim 5-15 -o clip.mp4
-
-# Concaténer plusieurs vidéos
 cauflia edit video1.mp4 video2.mp4 --concat -o fusion.mp4
-
-# Changer la vitesse
 cauflia edit video.mp4 --speed 2 -o fast.mp4
-
-# Ajouter un texte
 cauflia edit video.mp4 --text "Mon texte" -o texte.mp4
-
-# Ajouter un gradient
 cauflia edit video.mp4 --gradient sunset -o stylise.mp4
-
-# Mixer un audio
 cauflia edit video.mp4 --audio musique.mp3 -o mix.mp4
-
-# Voir les infos
 cauflia edit video.mp4 --info
-
-# Combiner plusieurs effets
 cauflia edit video.mp4 --trim 10-30 --speed 1.5 --gradient cyberpunk --audio bg.mp3 -o final.mp4
-```
 
-### Configuration
-
-```bash
-# Configuration interactive
-cauflia config
-
-# Voir la config actuelle
-cauflia config -s
-
-# Définir les clés rapidement
-cauflia config -g "AIzaSy..." -k "vc_..." -u "https://cauflia.app"
+# Configuration
+cauflia config                               # Interactive
+cauflia config -s                            # Voir config
+cauflia config -g "AIzaSy..." -k "vc_..."   # Définir les clés
 ```
 
 ## Structure des fichiers
