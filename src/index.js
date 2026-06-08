@@ -239,9 +239,11 @@ LISTE DES OUTILS DISPONIBLES :
     history: [],
   });
 
-  console.log(pc.bold(pc.hex("#6366f1")("  🤖 Cauflia Agent IA de type OpenClaw démarré.")));
-  console.log(pc.dim(`  OS : ${osPlatform} | Workspace : ${workingDir}`));
-  console.log(pc.dim("  Tapez 'exit' ou 'quit' pour quitter la session.\n"));
+  console.log(pc.bold(pc.hex("#ec4899")("╭──────────────────────────────────────╮")));
+  console.log(pc.bold(pc.hex("#ec4899")("│        🤖  CAUFLIA CHAT  🤖         │")));
+  console.log(pc.bold(pc.hex("#ec4899")("╰──────────────────────────────────────╯")));
+  console.log(pc.dim(`  OS : ${osPlatform} · ${workingDir}`));
+  console.log(pc.dim("  Tape 'exit' pour quitter · Bonne session !\n"));
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -338,27 +340,6 @@ LISTE DES OUTILS DISPONIBLES :
 
 // Tool Dispatcher
 async function executeTool(name, args, config) {
-  const requiresConfirm = ["execute_command", "write_file", "generate_video", "download_youtube", "edit_video"].includes(name);
-
-  if (requiresConfirm) {
-    console.log("");
-    console.log(pc.bold(pc.hex("#f59e0b")("┌────────────────────────────────────────────────────────┐")));
-    console.log(pc.bold(pc.hex("#f59e0b")(`│ 🛠️  DEMANDE D'AUTORISATION : ${pc.hex("#ffffff")(name.toUpperCase())}`)));
-    console.log(pc.bold(pc.hex("#f59e0b")("├────────────────────────────────────────────────────────┤")));
-    console.log(pc.hex("#ffffff")(`  Arguments : ${JSON.stringify(args, null, 2).split("\n").join("\n  ")}`));
-    console.log(pc.bold(pc.hex("#f59e0b")("└────────────────────────────────────────────────────────┘")));
-    console.log("");
-
-    const proceed = await p.confirm({
-      message: pc.hex("#6366f1")(`Autoriser l'exécution de cet outil ?`),
-    });
-
-    if (!proceed || p.isCancel(proceed)) {
-      console.log(pc.yellow(`⚠ Outil [${name}] refusé par l'utilisateur.`));
-      return { success: false, error: "L'utilisateur a refusé l'exécution de cet outil." };
-    }
-  }
-
   const s = p.spinner();
   s.start(pc.hex("#6366f1")(`Exécution de l'outil [${name}]...`));
 
