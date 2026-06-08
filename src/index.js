@@ -1,172 +1,210 @@
 import pc from "picocolors";
-import * as p from "@clack/prompts";
-import readline from "readline";
-import { streamChat, chatCompletion, supportsNativeTools, SYSTEM_PROMPT } from "./providers.js";
+import * as readline from "node:readline/promises";
+import { stdin as input, stdout as output } from "node:process";
+import { streamChat } from "./providers.js";
 import { createSession, loadLatestSession, saveSession, findToolCall } from "./session.js";
-import { TOOLS, executeTool } from "./tools.js";
+import { executeTool, checkPermission, TOOL_NAMES } from "./tools.js";
+import { parseModel, resolveApiKey, configWizard } from "./config.js";
 
-export async function startSession(config, initialPrompt = "") {
-  const activeProvider = config.activeProvider || "gemini";
-  const activeModel = config.activeModel || "gemini-1.5-flash";
-  const providerCfg = config.providers?.[activeProvider] || {};
+function banner() {
+  console.log(`\n  ${pc.bold("cauflia")} ${pc.dim("— Agent IA conversationnel")}`);
+  console.log(`  ${pc.dim("┈".repeat(30))}\n`);
+}
 
-  if (!providerCfg.apiKey && activeProvider !== "ollama") {
-    p.log.error(pc.red(`Aucune clé API configurée pour ${activeProvider}.`));
-    p.log.info(pc.cyan(`Configure-la avec : cauflia config`));
+function showHelp() {
+  console.log(`  ${pc.bold("Commandes :")}`);
+  console.log(`    ${pc.cyan("/model <provider/modèle>")}    ${pc.dim("Changer de modèle")}`);
+  console.log(`    ${pc.cyan("/new")}                        ${pc.dim("Nouvelle session")}`);
+  console.log(`    ${pc.cyan("/help")}                       ${pc.dim("Afficher l'aide")}`);
+  console.log(`    ${pc.cyan("exit")} / ${pc.cyan("quit")}          ${pc.dim("Sauvegarder et quitter")}`);
+  console.log("");
+}
+
+export async function startSession(config, initialPrompt = "", forceNew = false) {
+  const parsed = parseModel(config.model);
+  let providerName = parsed.provider;
+  let modelName = parsed.model;
+  let apiKey = resolveApiKey(config, providerName);
+
+  if (!apiKey && providerName !== "ollama") {
+    console.log(`\n  ${pc.red("╌".repeat(25))}`);
+    console.log(`  ${pc.red("✗")}  Aucune clé API pour ${pc.bold(providerName)}.`);
+    console.log(`  ${pc.red("╌".repeat(25))}\n`);
+    const rl = readline.createInterface({ input, output });
+    const answer = await rl.question(`  ${pc.cyan("Configurer Cauflia maintenant ?")} ${pc.dim("(O/n)")} `);
+    rl.close();
+    if (answer.trim().toLowerCase() !== "n") {
+      const result = await configWizard(config);
+      if (!result) return;
+      apiKey = resolveApiKey(config, providerName);
+    }
+    if (!apiKey && providerName !== "ollama") {
+      console.log(`\n  ${pc.dim("Tu peux aussi passer par une variable d'environnement :")}`);
+      console.log(`  ${pc.cyan(`  ${providerName.toUpperCase()}_API_KEY=... cauflia`)}\n`);
+      return;
+    }
+  }
+
+  const providerCfg = { ...config.provider?.[providerName], model: modelName, apiKey };
+  if (providerName === "ollama" && !providerCfg.baseUrl) providerCfg.baseUrl = "http://localhost:11434/v1";
+
+  let session = forceNew ? null : loadLatestSession();
+  if (!session) session = createSession(config.model);
+
+  banner();
+  if (session.messages.length > 0) {
+    console.log(`  ${pc.dim("Session reprise :")} ${pc.cyan(session.id)} ${pc.dim(`(${session.messages.length} messages)`)}`);
+  }
+  console.log(`  ${pc.dim("Modèle :")} ${pc.cyan(config.model)}`);
+  if (initialPrompt) console.log(`  ${pc.dim("Mode :")} ${pc.cyan("non-interactif")}`);
+  console.log("");
+
+  const rl = readline.createInterface({ input, output, terminal: true });
+
+  const processMessages = async () => {
+    const maxIter = 15;
+    for (let iter = 0; iter < maxIter; iter++) {
+      const spinner = ["/", "-", "\\", "|"];
+      let si = 0, spinTimer = null;
+      const startSpin = () => {
+        process.stdout.write(`  ${pc.dim(spinner[si])} Cauflia réfléchit...`);
+        spinTimer = setInterval(() => {
+          si = (si + 1) % spinner.length;
+          process.stdout.write(`\r  ${pc.dim(spinner[si])} Cauflia réfléchit...`);
+        }, 120);
+      };
+      const stopSpin = () => {
+        if (spinTimer) { clearInterval(spinTimer); spinTimer = null; }
+        process.stdout.write("\r" + " ".repeat(40) + "\r");
+      };
+
+      let fullText = "", streamEmpty = true;
+
+      try {
+        startSpin();
+        for await (const ev of streamChat(providerName, providerCfg, session.messages)) {
+          if (ev.type === "chunk") {
+            if (streamEmpty) { stopSpin(); console.log(`  ${pc.bold("Cauflia")} ${pc.dim("›")} `); streamEmpty = false; }
+            fullText += ev.text;
+            process.stdout.write(ev.text);
+          }
+        }
+        if (streamEmpty) stopSpin();
+        console.log("");
+
+        const tc = findToolCall(fullText);
+        if (tc) {
+          const toolName = tc.tool || tc.name;
+          const toolArgs = tc.arguments || tc.args;
+          const perm = checkPermission(config, toolName);
+
+          const cleanText = fullText.replace(/```(?:json)?[\s\S]*?"tool"[\s\S]*?```/gi, "").trim();
+          if (cleanText) {
+            session.messages.push({ role: "assistant", content: cleanText });
+          }
+
+          if (perm === "deny") {
+            session.messages.push({ role: "user", content: `[OUTIL BLOQUÉ] ${toolName} est interdit par la config.` });
+            continue;
+          }
+
+          if (perm === "ask") {
+            console.log(`\n  ${pc.bold(pc.yellow(`🔧 ${toolName}`))} ${pc.dim(JSON.stringify(toolArgs))}`);
+            const answer = await rl.question(`  ${pc.cyan("Autoriser cet outil ?")} ${pc.dim("(O/n)")} `);
+            if (answer.trim().toLowerCase() === "n") {
+              console.log(`  ${pc.yellow("⛔ Refusé")}\n`);
+              session.messages.push({ role: "user", content: `[REFUS] L'utilisateur a refusé l'outil ${toolName}.` });
+              continue;
+            }
+          }
+
+          console.log(`  ${pc.dim(`⚙️ ${toolName}...`)}`);
+          const result = await executeTool(toolName, toolArgs, config);
+          const status = result.success ? pc.green("✓") : pc.red("✗");
+          console.log(`  ${status} ${pc.dim(JSON.stringify(result).slice(0, 200))}\n`);
+
+          session.messages.push({ role: "user", content: `[RÉSULTAT ${toolName}]: ${JSON.stringify(result)}` });
+          continue;
+        }
+
+        if (fullText) {
+          session.messages.push({ role: "assistant", content: fullText });
+        }
+        saveSession(session);
+        return;
+
+      } catch (err) {
+        stopSpin();
+        const msg = err.message || String(err);
+        if (msg.includes("403") || msg.includes("API_KEY")) {
+          console.error(`  ${pc.red("✗ Clé API invalide ou bloquée pour")} ${pc.bold(providerName)}.`);
+          console.error(`  ${pc.dim("Vérifie ta clé avec : cauflia config")}`);
+        } else {
+          console.error(`  ${pc.red(msg)}`);
+        }
+        return;
+      }
+    }
+    console.log(`  ${pc.yellow("⚠ Trop d'itérations d'outils, arrêt.")}`);
+  };
+
+  const saveAndExit = () => {
+    saveSession(session);
+    rl.close();
+    console.log(`\n  ${pc.dim("Session sauvegardée. À bientôt !")}\n`);
+    process.exit(0);
+  };
+
+  process.on("SIGINT", saveAndExit);
+  process.on("SIGTERM", saveAndExit);
+
+  if (initialPrompt) {
+    console.log(`  ${pc.dim("❯")} ${initialPrompt}\n`);
+    session.messages.push({ role: "user", content: initialPrompt });
+    saveSession(session);
+    await processMessages();
+    rl.close();
     return;
   }
 
-  // Load or create session
-  let session = loadLatestSession();
-  if (session && session.provider !== activeProvider) session = null;
-  if (!session) {
-    session = createSession(activeProvider, activeModel);
-  }
-
-  console.log(pc.bold(pc.magenta("\n╭──────────────────────────────────────────╮")));
-  console.log(pc.bold(pc.magenta("│          🤖  CAUFLIA CHAT  🤖           │")));
-  console.log(pc.bold(pc.magenta("╰──────────────────────────────────────────╯")));
-  console.log(pc.dim(`  Modèle : ${activeProvider}/${activeModel}`));
-  console.log(pc.dim(`  Session : ${session.id}`));
-  console.log(pc.dim(`  Messages : ${session.messages.length}`));
-  if (session.messages.length > 0) {
-    console.log(pc.cyan(`  ↳ Session reprise (${session.messages.length} messages historiques)\n`));
-  } else {
-    console.log("");
-  }
-
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-
-  const ask = () => {
-    rl.question(`\n${pc.bold(pc.magenta("👤 Vous ❯ "))}`, async (input) => {
-      const trimmed = input.trim();
-      if (["exit", "quit", "/exit", "/quit"].includes(trimmed.toLowerCase())) {
-        console.log(pc.yellow("Session sauvegardée. À bientôt !"));
-        saveSession(session);
-        rl.close();
-        process.exit(0);
-      }
-      if (trimmed.startsWith("/model ")) {
-        const parts = trimmed.split(" ");
-        if (parts.length >= 3) {
-          session.provider = parts[1];
-          session.model = parts[2];
-          saveSession(session);
-          console.log(pc.green(`✔ Modèle changé : ${parts[1]}/${parts[2]}`));
-        } else {
-          console.log(pc.yellow("Usage: /model <provider> <model>"));
-        }
-        ask();
-        return;
-      }
-      if (trimmed.startsWith("/new")) {
-        session = createSession(activeProvider, activeModel);
-        console.log(pc.green(`✔ Nouvelle session : ${session.id}`));
-        ask();
-        return;
-      }
-      if (!trimmed) {
-        ask();
-        return;
-      }
-      await handleMessage(trimmed);
-    });
-  };
-
-  const handleMessage = async (text) => {
-    session.messages.push({ role: "user", content: text });
-    saveSession(session);
-
-    const s = p.spinner();
-    s.start(pc.magenta("Cauflia réfléchit..."));
-
+  while (true) {
+    let input;
     try {
-      const useNative = supportsNativeTools(activeProvider) && TOOLS.length > 0;
-      let fullText = "";
-      let toolCalls = [];
-
-      if (useNative) {
-        s.stop(pc.green("✔"));
-        const result = await chatCompletion(activeProvider, { ...providerCfg, model: activeModel }, session.messages, TOOLS);
-        fullText = result.text;
-        toolCalls = result.toolCalls;
-
-        if (fullText) {
-          console.log(`\n${pc.bold(pc.magenta("Cauflia ❯ "))}${fullText}`);
-        }
-      } else {
-        let isFirst = true;
-        const stream = streamChat(activeProvider, { ...providerCfg, model: activeModel }, session.messages);
-        for await (const event of stream) {
-          if (event.type === "chunk") {
-            if (isFirst) {
-              s.stop(pc.green("✔"));
-              console.log(`\n${pc.bold(pc.magenta("Cauflia ❯ "))}`);
-              isFirst = false;
-            }
-            fullText += event.text;
-            process.stdout.write(event.text);
-          }
-        }
-        if (isFirst) s.stop(pc.green("✔"));
-        console.log("");
-
-        const toolCallJson = findToolCall(fullText);
-        if (toolCallJson) {
-          toolCalls = [toolCallJson];
-          fullText = fullText.replace(/```(?:json)?\s*\{[^}]*"tool"[^}]*\}\s*```/gi, "").trim();
-        }
-      }
-
-      // Execute tools and continue
-      if (toolCalls.length > 0) {
-        session.messages.push({ role: "assistant", content: fullText || "[Utilisation d'outils...]" });
-        saveSession(session);
-
-        for (const tc of toolCalls) {
-          const toolResult = await executeTool(tc.name || tc.tool, tc.arguments || tc.args, config);
-          session.messages.push({
-            role: "user",
-            content: `[RÉSULTAT ${tc.name || tc.tool}]: ${JSON.stringify(toolResult)}`,
-          });
-        }
-
-        // Continue the conversation with tool results
-        s.start(pc.magenta("Cauflia continue..."));
-        let isFirst = true;
-        let followUpText = "";
-        const stream = streamChat(activeProvider, { ...providerCfg, model: activeModel }, session.messages);
-        for await (const event of stream) {
-          if (event.type === "chunk") {
-            if (isFirst) {
-              s.stop(pc.green("✔"));
-              console.log(`\n${pc.bold(pc.magenta("Cauflia ❯ "))}`);
-              isFirst = false;
-            }
-            followUpText += event.text;
-            process.stdout.write(event.text);
-          }
-        }
-        if (isFirst) s.stop(pc.green("✔"));
-        console.log("");
-        session.messages.push({ role: "assistant", content: followUpText || fullText });
-      } else if (fullText) {
-        session.messages.push({ role: "assistant", content: fullText });
-      }
-
+      input = await rl.question(`  ${pc.bold("❯")} `);
+    } catch {
       saveSession(session);
-    } catch (err) {
-      s.stop(pc.red("✖ Erreur"));
-      console.error(pc.red(err.message || String(err)));
+      break;
     }
+    const t = input.trim();
 
-    ask();
-  };
+    if (["exit", "quit"].includes(t.toLowerCase())) {
+      saveAndExit();
+    }
+    if (t === "/help") {
+      showHelp();
+      continue;
+    }
+    if (t.startsWith("/model ")) {
+      config.model = t.slice(7).trim();
+      const p = parseModel(config.model);
+      providerName = p.provider;
+      modelName = p.model;
+      providerCfg.model = modelName;
+      console.log(`  ${pc.green("✓")} ${pc.dim("Modèle :")} ${pc.cyan(config.model)}`);
+      Object.assign(providerCfg, config.provider?.[providerName] || {});
+      providerCfg.apiKey = resolveApiKey(config, providerName);
+      continue;
+    }
+    if (t === "/new") {
+      session = createSession(config.model);
+      console.log(`  ${pc.green("✓")} ${pc.dim("Nouvelle session :")} ${pc.cyan(session.id)}`);
+      continue;
+    }
+    if (!t) continue;
 
-  if (initialPrompt) {
-    console.log(pc.cyan(`\nLancement : ${initialPrompt}\n`));
-    await handleMessage(initialPrompt);
-  } else {
-    ask();
+    session.messages.push({ role: "user", content: t });
+    saveSession(session);
+    await processMessages();
   }
+  rl.close();
 }
