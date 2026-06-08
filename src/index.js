@@ -239,9 +239,9 @@ LISTE DES OUTILS DISPONIBLES :
     history: [],
   });
 
-  console.log(pc.bold(pc.hex("#ec4899")("╭──────────────────────────────────────╮")));
-  console.log(pc.bold(pc.hex("#ec4899")("│        🤖  CAUFLIA CHAT  🤖         │")));
-  console.log(pc.bold(pc.hex("#ec4899")("╰──────────────────────────────────────╯")));
+  console.log(pc.bold(pc.magenta("╭──────────────────────────────────────╮")));
+  console.log(pc.bold(pc.magenta("│        🤖  CAUFLIA CHAT  🤖         │")));
+  console.log(pc.bold(pc.magenta("╰──────────────────────────────────────╯")));
   console.log(pc.dim(`  OS : ${osPlatform} · ${workingDir}`));
   console.log(pc.dim("  Tape 'exit' pour quitter · Bonne session !\n"));
 
@@ -251,7 +251,7 @@ LISTE DES OUTILS DISPONIBLES :
   });
 
   const promptUser = () => {
-    rl.question(`\n${pc.bold(pc.hex("#a855f7")("👤 Vous ❯ "))}`, async (input) => {
+    rl.question(`\n${pc.bold(pc.magenta("👤 Vous ❯ "))}`, async (input) => {
       const trimmed = input.trim();
       if (trimmed.toLowerCase() === "exit" || trimmed.toLowerCase() === "quit") {
         p.outro(pc.yellow("Session fermée. À bientôt !"));
@@ -270,7 +270,7 @@ LISTE DES OUTILS DISPONIBLES :
 
   const handleMessage = async (messageText) => {
     const s = p.spinner();
-    s.start(pc.hex("#a855f7")("Cauflia réfléchit..."));
+    s.start(pc.magenta("Cauflia réfléchit..."));
 
     try {
       // 1. Initial response streaming
@@ -281,7 +281,7 @@ LISTE DES OUTILS DISPONIBLES :
       for await (const chunk of resultStream.stream) {
         if (isFirstChunk) {
           s.stop(pc.green("✔ Réponse reçue"));
-          console.log(`\n${pc.bold(pc.hex("#ec4899")("🤖 Cauflia ❯ "))}`);
+          console.log(`\n${pc.bold(pc.magenta("🤖 Cauflia ❯ "))}`);
           isFirstChunk = false;
         }
         const chunkText = chunk.text();
@@ -299,7 +299,7 @@ LISTE DES OUTILS DISPONIBLES :
         const resultString = JSON.stringify(toolResult);
 
         // Resume stream with tool execution output
-        s.start(pc.hex("#a855f7")("Analyse du résultat par l'agent..."));
+        s.start(pc.magenta("Analyse du résultat par l'agent..."));
         
         let isFirstFollowUpChunk = true;
         let followUpText = "";
@@ -308,7 +308,7 @@ LISTE DES OUTILS DISPONIBLES :
         for await (const chunk of followUpStream.stream) {
           if (isFirstFollowUpChunk) {
             s.stop(pc.green("✔ Analyse reçue"));
-            console.log(`\n${pc.bold(pc.hex("#ec4899")("🤖 Cauflia ❯ "))}`);
+            console.log(`\n${pc.bold(pc.magenta("🤖 Cauflia ❯ "))}`);
             isFirstFollowUpChunk = false;
           }
           const chunkText = chunk.text();
@@ -331,7 +331,7 @@ LISTE DES OUTILS DISPONIBLES :
 
   // If there was an initial prompt provided, send it immediately
   if (initialPrompt) {
-    console.log(pc.bold(pc.hex("#6366f1")(`👤 Lancement rapide : ${initialPrompt}\n`)));
+    console.log(pc.bold(pc.cyan(`👤 Lancement rapide : ${initialPrompt}\n`)));
     await handleMessage(initialPrompt);
   } else {
     promptUser();
@@ -341,7 +341,7 @@ LISTE DES OUTILS DISPONIBLES :
 // Tool Dispatcher
 async function executeTool(name, args, config) {
   const s = p.spinner();
-  s.start(pc.hex("#6366f1")(`Exécution de l'outil [${name}]...`));
+  s.start(pc.cyan(`Exécution de l'outil [${name}]...`));
 
   try {
     switch (name) {

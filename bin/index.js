@@ -31,9 +31,9 @@ function saveConfig(config) {
 
 function showBanner() {
   console.log("");
-  console.log(pc.bold(pc.hex("#6366f1")("    ╔═══════════════════════════════════════════╗")));
-  console.log(pc.bold(pc.hex("#a855f7")("    ║           ")) + pc.bold(pc.hex("#ec4899")("CAUFLIA v1.0")) + pc.bold(pc.hex("#a855f7")("            ║")));
-  console.log(pc.bold(pc.hex("#6366f1")("    ╚═══════════════════════════════════════════╝")));
+  console.log(pc.bold(pc.blue("    ╔═══════════════════════════════════════════╗")));
+  console.log(pc.bold(pc.magenta("    ║           ")) + pc.bold(pc.magenta("CAUFLIA v1.0")) + pc.bold(pc.magenta("            ║")));
+  console.log(pc.bold(pc.blue("    ╚═══════════════════════════════════════════╝")));
   console.log(pc.dim("    Agent autonome de création vidéo — mode interactif"));
   console.log("");
 }
@@ -57,11 +57,11 @@ program
     if (!config.GEMINI_API_KEY) {
       p.note(
         "Configure ta clé API Google Gemini pour utiliser Cauflia.",
-        pc.hex("#a855f7")("Configuration requise")
+        pc.magenta("Configuration requise")
       );
 
       const setup = await p.confirm({
-        message: pc.hex("#6366f1")("Configurer maintenant ?"),
+        message: pc.blue("Configurer maintenant ?"),
       });
 
       if (!setup || p.isCancel(setup)) {
@@ -110,7 +110,7 @@ program
 
     if (options.show) {
       console.log("");
-      console.log(pc.bold(pc.hex("#a855f7")(`  Configuration actuelle :`)));
+      console.log(pc.bold(pc.magenta(`  Configuration actuelle :`)));
       console.log(`    ${pc.dim("Gemini :")}     ${config.GEMINI_API_KEY ? pc.green("✔ configurée") : pc.red("✖ manquante")}`);
       console.log(`    ${pc.dim("Clé SaaS :")}   ${config.api_key ? pc.green("✔ configurée") : pc.dim("(non définie — mode local)")}`);
       console.log(`    ${pc.dim("URL SaaS :")}   ${config.saas_url || pc.dim("(non définie — mode local)")}`);
