@@ -11,3 +11,5 @@ dist/
 *.egg-info/
 .DS_Store
 Thumbs.db
+err.txt
+*.log

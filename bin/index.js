@@ -32,7 +32,7 @@ function saveConfig(config) {
 function showBanner() {
   console.log("");
   console.log(pc.bold(pc.hex("#6366f1")("    ╔═══════════════════════════════════════════╗")));
-  console.log(pc.bold(pc.hex("#a855f7")("    ║           ") + pc.bold(pc.hex("#ec4899")("CAUFLIA v1.0")) + pc.bold(pc.hex("#a855f7")("            ║")));
+  console.log(pc.bold(pc.hex("#a855f7")("    ║           ")) + pc.bold(pc.hex("#ec4899")("CAUFLIA v1.0")) + pc.bold(pc.hex("#a855f7")("            ║")));
   console.log(pc.bold(pc.hex("#6366f1")("    ╚═══════════════════════════════════════════╝")));
   console.log(pc.dim("    Agent autonome de création vidéo — mode interactif"));
   console.log("");
