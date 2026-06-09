@@ -154,7 +154,7 @@ function escapeFFmpegText(text) {
     .replace(/\r?\n/g, " ");
 }
 
-export async function assembleVideo(scenes, styleName, bgMusicStyle, outputFilename) {
+export async function assembleVideo(scenes, bgMusicStyle, outputFilename) {
   const compiledScenes = [];
   
   // 1. Download Background Music based on style
