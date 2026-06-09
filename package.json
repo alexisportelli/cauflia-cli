@@ -1,7 +1,7 @@
 {
   "name": "cauflia",
   "version": "1.0.0",
-  "description": "Cauflia — Agent IA conversationnel autonome (type OpenCode) avec montage vidéo, téléchargement YouTube et médiathèque locale",
+  "description": "Cauflia CLI — AI UGC Autopilot for founders & brands. Brand scan, script engine, video production and autopilot from the terminal.",
   "main": "src/index.js",
   "type": "module",
   "bin": {
@@ -16,12 +16,12 @@
     "agent",
     "video",
     "ai",
+    "ugc",
+    "autopilot",
     "gemini",
     "marketing",
     "editor",
-    "ffmpeg",
-    "youtube",
-    "downloader"
+    "ffmpeg"
   ],
   "author": "Alexis Portelli",
   "license": "MIT",

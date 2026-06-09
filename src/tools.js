@@ -6,6 +6,7 @@ import { assembleVideo } from "./video-generator.js";
 import * as editor from "./video-editor.js";
 import * as library from "./media-library.js";
 import { downloadYouTube, getInfo } from "./youtube.js";
+import { resolveApiKey, isDangerousCommand } from "./config.js";
 
 export const TOOL_NAMES = [
   "execute_command", "read_file", "write_file", "list_directory",
@@ -20,6 +21,12 @@ export function checkPermission(config, toolName) {
 export async function executeTool(name, args, config) {
   switch (name) {
     case "execute_command": {
+      if (!args.command || typeof args.command !== "string") {
+        return { success: false, error: "Aucune commande fournie." };
+      }
+      if (isDangerousCommand(args.command)) {
+        return { success: false, error: "Commande refusée (pattern dangereux détecté)." };
+      }
       try {
         const stdout = execSync(args.command, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], timeout: 120000 });
         return { success: true, stdout };
@@ -33,8 +40,9 @@ export async function executeTool(name, args, config) {
         if (!fs.existsSync(resolved)) return { success: false, error: `Fichier introuvable: ${resolved}` };
         if (fs.statSync(resolved).isDirectory()) return { success: false, error: `${resolved} est un dossier` };
         let content = fs.readFileSync(resolved, "utf-8");
-        if (content.length > 50000) content = content.slice(0, 50000) + "\n\n...[TRONQUÉ]...";
-        return { success: true, content };
+        const truncated = content.length > 50000;
+        if (truncated) content = content.slice(0, 50000) + "\n\n...[TRONQUÉ: fichier >50K caractères]...";
+        return { success: true, content, truncated };
       } catch (err) { return { success: false, error: err.message }; }
     }
     case "write_file": {
@@ -42,6 +50,10 @@ export async function executeTool(name, args, config) {
         const resolved = path.resolve(args.path);
         const parent = path.dirname(resolved);
         if (!fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
+        if (fs.existsSync(resolved)) {
+          const backup = resolved + ".bak";
+          fs.copyFileSync(resolved, backup);
+        }
         fs.writeFileSync(resolved, args.content, "utf-8");
         return { success: true, message: `Écrit: ${resolved}` };
       } catch (err) { return { success: false, error: err.message }; }
@@ -61,7 +73,7 @@ export async function executeTool(name, args, config) {
     }
     case "generate_video": {
       try {
-        const geminiKey = config.provider?.gemini?.apiKey;
+        const geminiKey = resolveApiKey(config, "gemini");
         if (!geminiKey) return { success: false, error: "Clé Gemini requise pour generate_video" };
         const genAI = new GoogleGenerativeAI(geminiKey);
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -75,7 +87,7 @@ JSON: { "title": "...", "music_style": "...", "scenes": [{ "title": "...", "mood
         if (json.endsWith("```")) json = json.slice(0, -3);
         const data = JSON.parse(json.trim());
         const out = path.join(library.getDir("exports"), `cauflia_${Date.now()}.mp4`);
-        const result = await assembleVideo(data.scenes, "cinematic", data.music_style, out);
+        const result = await assembleVideo(data.scenes, data.music_style, out);
         return { success: true, filePath: result.filePath, duration: result.duration, title: data.title };
       } catch (err) { return { success: false, error: err.message }; }
     }
@@ -92,26 +104,42 @@ JSON: { "title": "...", "music_style": "...", "scenes": [{ "title": "...", "mood
     }
     case "edit_video": {
       try {
+        const inputs = args.inputs;
+        if (!inputs || !Array.isArray(inputs) || inputs.length === 0) {
+          return { success: false, error: "edit_video nécessite un tableau 'inputs' avec au moins un fichier." };
+        }
         const exp = library.getDir("exports");
-        let input = path.resolve(args.inputs[0]);
+        let input = path.resolve(inputs[0]);
         const outPath = args.output ? path.resolve(args.output) : path.join(exp, `edit_${Date.now()}.mp4`);
-        const tmp = () => path.join(exp, `tmp_${Date.now()}.mp4`);
+        const tmpFiles = [];
+        const tmp = () => {
+          const f = path.join(exp, `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.mp4`);
+          tmpFiles.push(f);
+          return f;
+        };
+        const cleanup = () => {
+          for (const f of tmpFiles) { try { fs.unlinkSync(f); } catch {} }
+        };
 
-        if (args.trim) { const [s, e] = args.trim.split("-").map(Number); const o = tmp(); editor.trimClip(input, o, s, (e || s + 10) - s); input = o; }
-        if (args.concat && args.inputs.length > 1) { const o = tmp(); editor.concatClips(args.inputs.map(i => path.resolve(i)), o); input = o; }
-        if (args.speed) { const o = tmp(); editor.changeSpeed(input, o, args.speed); input = o; }
-        if (args.resize) { const [w, h] = args.resize.split("x").map(Number); const o = tmp(); editor.resizeClip(input, o, w, h); input = o; }
-        if (args.crop) { const o = tmp(); editor.cropClip(input, o, args.crop); input = o; }
-        if (args.text) { const o = tmp(); editor.addTextOverlay(input, o, args.text); input = o; }
-        if (args.overlay) { const o = tmp(); editor.overlayImage(input, path.resolve(args.overlay), o); input = o; }
-        if (args.gradient) { const o = tmp(); editor.addGradientOverlay(input, o, args.gradient); input = o; }
-        if (args.vignette) { const o = tmp(); editor.addVignette(input, o); input = o; }
-        if (args.grain) { const o = tmp(); editor.addFilmGrain(input, o); input = o; }
-        if (args.audio) { const o = tmp(); editor.mixAudio(input, path.resolve(args.audio), o); input = o; }
-        if (args.replaceAudio) { const o = tmp(); editor.replaceAudio(input, path.resolve(args.replaceAudio), o); input = o; }
-        if (args.extractAudio) { const audioPath = outPath.replace(/\.\w+$/, ".mp3"); editor.extractAudio(input, audioPath); return { success: true, filePath: audioPath }; }
-        if (input !== outPath) fs.copyFileSync(input, outPath);
-        return { success: true, filePath: outPath };
+        try {
+          if (args.trim) { const [s, e] = args.trim.split("-").map(Number); const o = tmp(); editor.trimClip(input, o, s, (e || s + 10) - s); input = o; }
+          if (args.concat && inputs.length > 1) { const o = tmp(); editor.concatClips(inputs.map(i => path.resolve(i)), o); input = o; }
+          if (args.speed) { const o = tmp(); editor.changeSpeed(input, o, args.speed); input = o; }
+          if (args.resize) { const [w, h] = args.resize.split("x").map(Number); const o = tmp(); editor.resizeClip(input, o, w, h); input = o; }
+          if (args.crop) { const o = tmp(); editor.cropClip(input, o, args.crop); input = o; }
+          if (args.text) { const o = tmp(); editor.addTextOverlay(input, o, args.text); input = o; }
+          if (args.overlay) { const o = tmp(); editor.overlayImage(input, path.resolve(args.overlay), o); input = o; }
+          if (args.gradient) { const o = tmp(); editor.addGradientOverlay(input, o, args.gradient); input = o; }
+          if (args.vignette) { const o = tmp(); editor.addVignette(input, o); input = o; }
+          if (args.grain) { const o = tmp(); editor.addFilmGrain(input, o); input = o; }
+          if (args.audio) { const o = tmp(); editor.mixAudio(input, path.resolve(args.audio), o); input = o; }
+          if (args.replaceAudio) { const o = tmp(); editor.replaceAudio(input, path.resolve(args.replaceAudio), o); input = o; }
+          if (args.extractAudio) { const audioPath = outPath.replace(/\.\w+$/, ".mp3"); editor.extractAudio(input, audioPath); return { success: true, filePath: audioPath }; }
+          if (input !== outPath) fs.copyFileSync(input, outPath);
+          return { success: true, filePath: outPath };
+        } finally {
+          cleanup();
+        }
       } catch (err) { return { success: false, error: err.message }; }
     }
     case "manage_library": {
